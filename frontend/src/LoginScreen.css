@@ -1,0 +1,263 @@
+/* ── Root ────────────────────────────────────────────────────────────── */
+.ls-root {
+  min-height: 100svh;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Nav bar ─────────────────────────────────────────────────────────── */
+.ls-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 40px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.ls-nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ls-nav-logo-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #6c47ff 0%, #4f23e2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 16px;
+  box-shadow: 0 2px 8px rgba(108,71,255,.40);
+}
+
+.ls-nav-logo-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ls-nav-auth {
+  display: flex;
+  align-items: center;
+}
+
+.ls-nav-loading {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ── Main layout ─────────────────────────────────────────────────────── */
+.ls-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 48px 40px 48px 60px;
+  gap: 40px;
+  overflow: hidden;
+}
+
+/* ── Left copy ───────────────────────────────────────────────────────── */
+.ls-copy {
+  flex: 0 0 auto;
+  max-width: 480px;
+  z-index: 2;
+}
+
+.ls-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  background: rgba(108,71,255,.12);
+  border: 1px solid rgba(108,71,255,.25);
+  color: #a78bfa;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  letter-spacing: 0.3px;
+}
+
+.ls-heading {
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.15;
+  margin: 0 0 16px;
+  letter-spacing: -1px;
+}
+
+.ls-heading-accent {
+  background: linear-gradient(135deg, #6c47ff 0%, #4a9eff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ls-subtext {
+  font-size: 15px;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  margin: 0 0 28px;
+  max-width: 420px;
+}
+
+/* ── Feature chips ───────────────────────────────────────────────────── */
+.ls-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 36px;
+}
+
+.ls-feature-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.ls-feature-icon {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* ── CTA area ────────────────────────────────────────────────────────── */
+.ls-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ls-cta-loading {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.ls-error {
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--red-bg);
+  color: var(--red);
+  border: 1px solid rgba(248,81,73,.25);
+  font-size: 13px;
+  max-width: 320px;
+}
+
+.ls-privacy {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.ls-privacy a {
+  color: var(--blue);
+  text-decoration: none;
+}
+.ls-privacy a:hover { text-decoration: underline; }
+
+/* ── Orbit scene ─────────────────────────────────────────────────────── */
+.ls-orbit-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: hidden;
+  min-height: 500px;
+  position: relative;
+}
+
+.ls-orbit-scene {
+  position: relative;
+  width: 620px;
+  height: 620px;
+  flex-shrink: 0;
+  /* Shift right so only left half is visible — mirrors the reference design */
+  transform: translateX(10%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Centre logo bubble */
+.ls-orbit-center {
+  position: absolute;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6c47ff 0%, #4f23e2 100%);
+  box-shadow: 0 8px 32px rgba(108,71,255,.50);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 28px;
+  font-weight: 800;
+  z-index: 3;
+}
+
+/* Each orbit ring */
+.orbit-ring {
+  position: absolute;
+  animation: ls-spin linear infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Dotted border drawn as a pseudo-element so it doesn't spin with the ring */
+.orbit-border {
+  position: absolute;
+  border-radius: 50%;
+  border: 1.5px dashed var(--border);
+  pointer-events: none;
+}
+
+/* Individual icon badge */
+.orbit-icon {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  /* Counter-rotate to keep icons upright */
+  animation: ls-counter-spin linear infinite;
+}
+
+@keyframes ls-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes ls-counter-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(-360deg); }
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .ls-nav { padding: 14px 20px; }
+  .ls-main { flex-direction: column; padding: 32px 20px; align-items: flex-start; }
+  .ls-orbit-wrap { display: none; }
+  .ls-copy { max-width: 100%; }
+}
