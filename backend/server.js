@@ -39,9 +39,23 @@ app.use(globalLimiter);
 app.use("/tmp-img", express.static(TEMP_IMG_DIR));
 
 // ── Routes ────────────────────────────────────────────────────────────
-app.use("/auth",      authRoutes);
-app.use("/",          facebookRoutes);
-app.use("/threads",   threadsRoutes);
+// /auth — app login (Google JWT)
+app.use("/auth",          authRoutes);
+
+// Facebook routes live at both / (legacy) and /api for production
+app.use("/api",           facebookRoutes);
+
+// Platform routes: /api/* for frontend API calls
+app.use("/api/threads",   threadsRoutes);
+app.use("/api/linkedin",  linkedinRoutes);
+app.use("/api/x",         xRoutes);
+app.use("/api/instagram", instagramRoutes);
+
+// OAuth callbacks must stay at their registered URIs (no /api prefix)
+// These are registered in each platform's developer portal as:
+//   https://api.simar.dev/linkedin/callback
+//   https://api.simar.dev/x/callback
+//   https://api.simar.dev/instagram/callback
 app.use("/linkedin",  linkedinRoutes);
 app.use("/x",         xRoutes);
 app.use("/instagram", instagramRoutes);
