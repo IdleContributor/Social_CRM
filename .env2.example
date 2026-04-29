@@ -1,0 +1,31 @@
+# ── X (Twitter) ───────────────────────────────────────────────────────
+
+X_CLIENT_ID=your_x_client_id
+X_CLIENT_SECRET=your_x_client_secret
+X_REDIRECT_URI=
+
+
+IG_REDIRECT_URI=
+
+# ── Facebook ──────────────────────────────────────────────────────────
+APP_ID=your_facebook_app_id
+APP_SECRET=your_facebook_app_secret
+
+# ── Threads ───────────────────────────────────────────────────────────
+THREADS_APP_ID=your_threads_app_id
+THREADS_APP_SECRET=your_threads_app_secret
+THREADS_REDIRECT_URI=
+
+PUBLIC_HOST=
+
+# ── LinkedIn ──────────────────────────────────────────────────────────
+LI_CLIENT_ID=your_linkedin_client_id
+LI_CLIENT_SECRET=your_linkedin_client_secret
+
+LI_REDIRECT_URI=
+# ── URLs ──────────────────────────────────────────────────────────────
+FRONTEND_URL=
+BACKEND_URL=
+
+# ── Server ────────────────────────────────────────────────────────────
+PORT=
