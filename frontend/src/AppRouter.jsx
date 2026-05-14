@@ -87,6 +87,16 @@ function Sidebar({ view, setView, sessions, signOut, user, collapsed }) {
 
       {/* Footer */}
       <div className="sidebar-footer">
+        {/* Theme toggle — always first, above user info */}
+        <button className="btn btn-ghost btn-sm"
+          onClick={toggleTheme}
+          title={collapsed ? (isDark ? "Light mode" : "Dark mode") : undefined}
+          style={{ width: "100%", justifyContent: collapsed ? "center" : "flex-start",
+            gap: 8, marginBottom: 8, padding: collapsed ? "8px 0" : undefined }}>
+          {isDark ? <Sun size={14} /> : <Moon size={14} />}
+          {!collapsed && (isDark ? "Light mode" : "Dark mode")}
+        </button>
+
         {/* User avatar — always show, name/email only when expanded */}
         {user && (
           <div style={{
@@ -115,15 +125,6 @@ function Sidebar({ view, setView, sessions, signOut, user, collapsed }) {
             )}
           </div>
         )}
-
-        <button className="btn btn-ghost btn-sm"
-          onClick={toggleTheme}
-          title={collapsed ? (isDark ? "Light mode" : "Dark mode") : undefined}
-          style={{ width: "100%", justifyContent: collapsed ? "center" : "flex-start",
-            gap: 8, marginBottom: 4, padding: collapsed ? "8px 0" : undefined }}>
-          {isDark ? <Sun size={14} /> : <Moon size={14} />}
-          {!collapsed && (isDark ? "Light mode" : "Dark mode")}
-        </button>
 
         <button className="btn btn-ghost btn-sm"
           onClick={signOut}
@@ -162,6 +163,7 @@ export default function AppRouter() {
   const { user, signOut } = useAuth();
   const { sessions, refresh } = usePlatformSessions();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const [view, setView] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -177,6 +179,7 @@ export default function AppRouter() {
 
   const handleNavigate = (v) => {
     setView(v);
+    setMobileOpen(false);
     refresh();
   };
 
@@ -187,7 +190,7 @@ export default function AppRouter() {
 
   return (
     <div className="app-shell-outer">
-      {/* Sidebar — collapses on desktop, hidden on mobile */}
+      {/* Desktop sidebar — collapses/expands */}
       <Sidebar
         view={view}
         setView={handleNavigate}
@@ -197,15 +200,39 @@ export default function AppRouter() {
         collapsed={sidebarCollapsed}
       />
 
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 399 }}
+        />
+      )}
+
+      {/* Mobile slide-in drawer */}
+      <div className={`mobile-drawer${mobileOpen ? " open" : ""}`}>
+        <Sidebar
+          view={view}
+          setView={handleNavigate}
+          sessions={sessions}
+          signOut={signOut}
+          user={user}
+          collapsed={false}
+        />
+      </div>
+
       {/* Main content */}
       <div className="main-content">
-        {/* Topbar */}
         <header className="topbar">
-          {/* Hamburger — toggles sidebar collapse on desktop, no-op on mobile */}
           <button
             className="btn btn-ghost btn-icon"
-            onClick={() => setSidebarCollapsed((v) => !v)}
-            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() => {
+              if (window.innerWidth <= 768) {
+                setMobileOpen((v) => !v);
+              } else {
+                setSidebarCollapsed((v) => !v);
+              }
+            }}
+            aria-label="Toggle navigation"
             style={{ flexShrink: 0 }}
           >
             <Menu size={20} />
@@ -233,7 +260,6 @@ export default function AppRouter() {
           </div>
         </header>
 
-        {/* Page panels */}
         <div className="page-panels">
           {view === "home"      && <HomePage user={user} onNavigate={handleNavigate} sessions={sessions} onRefresh={refresh} />}
           {view === "facebook"  && <FacebookPage />}

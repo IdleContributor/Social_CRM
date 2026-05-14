@@ -1,7 +1,4 @@
 import { useEffect } from "react";
-import api from "../api.js";
-import { useFacebookSDK, loginWithThreads, loginWithLinkedIn, loginWithX, loginWithInstagram } from "../hooks/usePlatformLogin.js";
-import { lsSet } from "../hooks/useLocalStorage.js";
 import { RefreshCw } from "lucide-react";
 
 const PLATFORMS = [
@@ -13,38 +10,14 @@ const PLATFORMS = [
 ];
 
 export default function HomePage({ user, onNavigate, sessions, onRefresh }) {
-  useFacebookSDK();
-
   useEffect(() => { onRefresh(); }, []);
 
-  const handleFacebookLogin = () => {
-    if (!window.FB) {
-      alert("Facebook SDK is still loading. Please wait a moment.");
-      return;
-    }
-    window.FB.login(
-      (response) => {
-        if (!response.authResponse) return;
-        api.get(`https://graph.facebook.com/v19.0/me/accounts?access_token=${response.authResponse.accessToken}`)
-          .then((res) => {
-            const pages = res.data.data || [];
-            if (!pages.length) { alert("No Facebook Pages found."); return; }
-            lsSet("fb_pages", pages);
-            lsSet("fb_active_page", pages[0]);
-            onRefresh();
-          })
-          .catch(console.error);
-      },
-      { scope: "pages_show_list,pages_read_engagement,pages_read_user_content,pages_manage_posts" }
-    );
-  };
-
   const loginHandlers = {
-    facebook:  handleFacebookLogin,
-    threads:   loginWithThreads,
-    linkedin:  loginWithLinkedIn,
-    x:         loginWithX,
-    instagram: loginWithInstagram,
+    facebook:  () => onNavigate("facebook"),
+    threads:   () => onNavigate("threads"),
+    linkedin:  () => onNavigate("linkedin"),
+    x:         () => onNavigate("x"),
+    instagram: () => onNavigate("instagram"),
   };
 
   const connectedCount = PLATFORMS.filter((p) => sessions[p.id]).length;
