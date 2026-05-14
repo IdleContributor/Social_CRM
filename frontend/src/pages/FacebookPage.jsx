@@ -3,15 +3,11 @@ import api from "../api.js";
 import "../App.css";
 import { useImagePicker } from "../hooks/useImagePicker.js";
 import { lsGet, lsSet, lsRemove } from "../hooks/useLocalStorage.js";
-import AppHeader from "../components/AppHeader.jsx";
 import ComposeCard from "../components/ComposeCard.jsx";
 import PostCard from "../components/PostCard.jsx";
+import { RefreshCw, Clock, Send } from "lucide-react";
 
-function StatusLed({ connected }) {
-  return <span className={`status-led ${connected ? "led-green" : "led-red"}`} aria-hidden="true" />;
-}
-
-export default function FacebookPage({ onBack }) {
+export default function FacebookPage() {
   const [pages, setPages]           = useState([]);
   const [posts, setPosts]           = useState([]);
   const [sdkReady, setSdkReady]     = useState(false);
@@ -24,16 +20,13 @@ export default function FacebookPage({ onBack }) {
 
   const [scheduleMode, setScheduleMode]   = useState(false);
   const [scheduledTime, setScheduledTime] = useState("");
-
   const [scheduledPosts, setScheduledPosts]     = useState([]);
   const [scheduledLoading, setScheduledLoading] = useState(false);
   const [cancellingId, setCancellingId]         = useState(null);
-
   const [engagement, setEngagement] = useState({});
 
   const isLoggedIn = pages.length > 0;
 
-  // ── Restore persisted session ──────────────────────────────────────
   useEffect(() => {
     const savedPages = lsGet("fb_pages");
     const savedPage  = lsGet("fb_active_page");
@@ -48,13 +41,12 @@ export default function FacebookPage({ onBack }) {
     }
   }, [activePage]);
 
-  // ── Load FB SDK ────────────────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
       try {
         const cfg = await api.get("/api/config");
         const appId = cfg.data.appId;
-        if (!appId) { console.warn("APP_ID missing"); return; }
+        if (!appId) return;
         if (window.FB) { setSdkReady(true); return; }
         window.fbAsyncInit = function () {
           window.FB.init({ appId, cookie: true, xfbml: true, version: "v19.0" });
@@ -62,28 +54,21 @@ export default function FacebookPage({ onBack }) {
         };
         const script = document.createElement("script");
         script.src = "https://connect.facebook.net/en_US/sdk.js";
-        script.async = true;
-        script.defer = true;
+        script.async = true; script.defer = true;
         document.body.appendChild(script);
-      } catch (err) {
-        console.error("SDK load error:", err);
-      }
+      } catch (err) { console.error("SDK load error:", err); }
     };
     init();
   }, []);
 
-  // ── Data fetchers ──────────────────────────────────────────────────
   const fetchPosts = async (pageId, token) => {
     try {
       const res = await api.get(`/api/page-posts?pageId=${pageId}&token=${token}`);
       setPosts(res.data.data || []);
     } catch (err) {
-      // FB token expired — clear session
       if (err.response?.data?.error?.code === 190) {
         clearSession();
-        setPostStatus({ type: "error", msg: "Facebook session expired. Please log in again." });
-      } else {
-        console.error("Fetch posts error:", err);
+        setPostStatus({ type: "error", msg: "Facebook session expired. Please reconnect." });
       }
     }
   };
@@ -93,11 +78,8 @@ export default function FacebookPage({ onBack }) {
     try {
       const res = await api.get(`/api/scheduled-posts?pageId=${pageId}&token=${token}`);
       setScheduledPosts(res.data.data || []);
-    } catch (err) {
-      console.error("Fetch scheduled posts error:", err);
-    } finally {
-      setScheduledLoading(false);
-    }
+    } catch (err) { console.error(err); }
+    finally { setScheduledLoading(false); }
   };
 
   const cancelScheduledPost = async (postId) => {
@@ -106,56 +88,33 @@ export default function FacebookPage({ onBack }) {
     try {
       await api.delete(`/api/scheduled-posts/${postId}?token=${activePage.access_token}`);
       setScheduledPosts((prev) => prev.filter((p) => p.id !== postId));
-    } catch (err) {
-      alert(err.response?.data?.error?.message || "Failed to cancel post.");
-    } finally {
-      setCancellingId(null);
-    }
+    } catch (err) { alert(err.response?.data?.error?.message || "Failed to cancel."); }
+    finally { setCancellingId(null); }
   };
 
-  // ── Facebook login / logout ────────────────────────────────────────
   const handleLogin = async (userToken) => {
     try {
-      const pagesRes = await api.get(
-        `https://graph.facebook.com/v19.0/me/accounts?access_token=${userToken}`
-      );
-      const pagesData = pagesRes.data.data || [];
+      const res = await api.get(`https://graph.facebook.com/v19.0/me/accounts?access_token=${userToken}`);
+      const pagesData = res.data.data || [];
       setPages(pagesData);
       lsSet("fb_pages", pagesData);
-      if (pagesData.length === 0) {
-        alert("No pages found. Make sure you manage a Facebook Page.");
-        return;
-      }
-      const page = pagesData[0];
-      setActivePage(page);
-      lsSet("fb_active_page", page);
-    } catch (err) {
-      console.error("Graph API error:", err);
-    }
+      if (!pagesData.length) { alert("No Facebook Pages found."); return; }
+      setActivePage(pagesData[0]);
+      lsSet("fb_active_page", pagesData[0]);
+    } catch (err) { console.error(err); }
   };
 
   const login = () => {
-    if (!sdkReady) {
-      alert("Facebook SDK is still loading, please wait a moment and try again.");
-      return;
-    }
+    if (!sdkReady) { alert("Facebook SDK is still loading."); return; }
     window.FB.login(
-      (response) => {
-        if (response.authResponse) handleLogin(response.authResponse.accessToken);
-        else console.log("User cancelled login");
-      },
+      (r) => { if (r.authResponse) handleLogin(r.authResponse.accessToken); },
       { scope: "pages_show_list,pages_read_engagement,pages_read_user_content,pages_manage_posts" }
     );
   };
 
   const clearSession = () => {
-    lsRemove("fb_pages");
-    lsRemove("fb_active_page");
-    setPages([]);
-    setActivePage(null);
-    setPosts([]);
-    setScheduledPosts([]);
-    setEngagement({});
+    lsRemove("fb_pages"); lsRemove("fb_active_page");
+    setPages([]); setActivePage(null); setPosts([]); setScheduledPosts([]); setEngagement({});
   };
 
   const logout = () => {
@@ -163,7 +122,6 @@ export default function FacebookPage({ onBack }) {
     clearSession();
   };
 
-  // ── Engagement ─────────────────────────────────────────────────────
   const fetchComments = useCallback(async (postId, token, after = null) => {
     setEngagement((prev) => ({ ...prev, [postId]: { ...prev[postId], loading: true, error: null } }));
     try {
@@ -185,14 +143,14 @@ export default function FacebookPage({ onBack }) {
     } catch (err) {
       setEngagement((prev) => ({
         ...prev,
-        [postId]: { ...prev[postId], loading: false, error: err.response?.data?.error?.message || "Failed to load comments." },
+        [postId]: { ...prev[postId], loading: false, error: "Failed to load comments." },
       }));
     }
   }, []);
 
   const toggleComments = (post) => {
-    const token   = activePage?.access_token;
-    const postId  = post.id;
+    const token = activePage?.access_token;
+    const postId = post.id;
     const current = engagement[postId];
     if (current?.open) {
       setEngagement((prev) => ({ ...prev, [postId]: { ...prev[postId], open: false } }));
@@ -202,106 +160,83 @@ export default function FacebookPage({ onBack }) {
     }
   };
 
-  // ── Create post ────────────────────────────────────────────────────
   const handleCreatePost = async () => {
     if (!activePage) { alert("Please log in first."); return; }
     if (!postText.trim() && !postImage) { alert("Add some text or an image."); return; }
-    if (scheduleMode) {
-      if (!scheduledTime) { alert("Please pick a date and time to schedule."); return; }
-      if (new Date(scheduledTime) < new Date(Date.now() + 11 * 60 * 1000)) {
-        alert("Scheduled time must be at least 10 minutes from now.");
-        return;
-      }
+    if (scheduleMode && !scheduledTime) { alert("Pick a date and time to schedule."); return; }
+    if (scheduleMode && new Date(scheduledTime) < new Date(Date.now() + 11 * 60 * 1000)) {
+      alert("Scheduled time must be at least 10 minutes from now."); return;
     }
-
-    setPosting(true);
-    setPostStatus(null);
+    setPosting(true); setPostStatus(null);
     try {
-      const formData = new FormData();
-      formData.append("pageId", activePage.id);
-      formData.append("token", activePage.access_token);
-      if (postText.trim()) formData.append("message", postText.trim());
-      if (postImage) formData.append("image", postImage);
-      if (scheduleMode && scheduledTime)
-        formData.append("scheduledTime", new Date(scheduledTime).toISOString());
-
-      const res = await api.post("/api/create-post", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
+      const fd = new FormData();
+      fd.append("pageId", activePage.id);
+      fd.append("token", activePage.access_token);
+      if (postText.trim()) fd.append("message", postText.trim());
+      if (postImage) fd.append("image", postImage);
+      if (scheduleMode && scheduledTime) fd.append("scheduledTime", new Date(scheduledTime).toISOString());
+      const res = await api.post("/api/create-post", fd, { headers: { "Content-Type": "multipart/form-data" } });
       if (res.data.scheduled) {
-        const when = new Date(res.data.scheduledTime).toLocaleString();
-        setPostStatus({ type: "success", msg: `⏰ Post scheduled for ${when}` });
+        setPostStatus({ type: "success", msg: `Scheduled for ${new Date(res.data.scheduledTime).toLocaleString()}` });
         fetchScheduledPosts(activePage.id, activePage.access_token);
       } else {
-        setPostStatus({ type: "success", msg: "Post published successfully! 🎉" });
+        setPostStatus({ type: "success", msg: "Post published successfully." });
         setTimeout(() => fetchPosts(activePage.id, activePage.access_token), 1500);
       }
-
-      setPostText("");
-      removeImage();
-      setScheduleMode(false);
-      setScheduledTime("");
+      setPostText(""); removeImage(); setScheduleMode(false); setScheduledTime("");
     } catch (err) {
-      // FB token expired mid-session
-      if (err.response?.data?.error?.code === 190) {
-        clearSession();
-        setPostStatus({ type: "error", msg: "Facebook session expired. Please log in again." });
-        return;
-      }
-      setPostStatus({ type: "error", msg: err.response?.data?.error?.message || "Failed to publish post." });
-    } finally {
-      setPosting(false);
-    }
+      if (err.response?.data?.error?.code === 190) { clearSession(); setPostStatus({ type: "error", msg: "Session expired." }); return; }
+      setPostStatus({ type: "error", msg: err.response?.data?.error?.message || "Failed to publish." });
+    } finally { setPosting(false); }
   };
 
   const dtMin = new Date(Date.now() + 11 * 60 * 1000).toISOString().slice(0, 16);
   const dtMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16);
 
-  // ── Render ─────────────────────────────────────────────────────────
-  return (
-    <div className="app-shell">
-      <AppHeader onBack={onBack} logo="f" title="Facebook Page CRM" subtitle="Manage posts &amp; engagement">
-        <StatusLed connected={isLoggedIn} />
-        {isLoggedIn && (
-          <button className="btn btn-ghost" style={{ marginLeft: "auto" }} onClick={logout}>
-            🚪 Logout
+  /* ── Not connected ── */
+  if (!isLoggedIn) {
+    return (
+      <div className="page-content">
+        {postStatus && <div className={`status-banner ${postStatus.type}`} style={{ marginBottom: 20 }}>{postStatus.msg}</div>}
+        <div className="connect-prompt">
+          <div className="connect-prompt-icon" style={{ background: "#1877f2" }}>f</div>
+          <h2>Connect Facebook</h2>
+          <p>Link your Facebook Pages to schedule posts, view engagement, and manage comments.</p>
+          <button className="btn btn-primary btn-lg" onClick={login} disabled={!sdkReady}>
+            {sdkReady ? "Connect Facebook" : "Loading SDK…"}
           </button>
-        )}
-      </AppHeader>
-
-      {postStatus?.type === "error" && !isLoggedIn && (
-        <div className="status-banner error" style={{ marginBottom: 16 }}>{postStatus.msg}</div>
-      )}
-
-      {!isLoggedIn && (
-        <div style={{ padding: "60px 20px", textAlign: "center" }}>
-          <p style={{ color: "var(--text-muted)", fontSize: 15 }}>
-            Please log in from the home page to access Facebook features.
-          </p>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {isLoggedIn && (
-        <>
-          <div className="section-label">Your Pages</div>
-          <div className="pages-row">
-            {pages.map((p) => (
-              <button
-                key={p.id}
-                className={`page-chip${activePage?.id === p.id ? " active" : ""}`}
-                onClick={() => { setActivePage(p); lsSet("fb_active_page", p); }}
-              >
-                {p.name}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+  /* ── Connected ── */
+  return (
+    <div className="page-content">
+      {/* Page selector + logout */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <div className="pages-row" style={{ marginBottom: 0 }}>
+          {pages.map((p) => (
+            <button
+              key={p.id}
+              className={`page-chip${activePage?.id === p.id ? " active" : ""}`}
+              onClick={() => { setActivePage(p); lsSet("fb_active_page", p); }}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={logout} style={{ color: "var(--red)", flexShrink: 0 }}>
+          Disconnect
+        </button>
+      </div>
 
-      {isLoggedIn && activePage && (
+      {postStatus && <div className={`status-banner ${postStatus.type}`} style={{ marginBottom: 20 }}>{postStatus.msg}</div>}
+
+      {/* Compose */}
+      {activePage && (
         <ComposeCard
-          title="✏️ Create a Post"
+          title="New Post"
           badge={activePage.name}
           placeholder="What's on your mind?"
           value={postText}
@@ -311,39 +246,34 @@ export default function FacebookPage({ onBack }) {
           fileInputRef={fileInputRef}
           onImageChange={handleImageChange}
           postImage={postImage}
-          status={postStatus}
+          status={null}
           actions={
             <>
               <button
-                className={`btn btn-schedule${scheduleMode ? " active" : ""}`}
+                className={`btn btn-sm${scheduleMode ? " btn-primary" : " btn-outline"}`}
                 onClick={() => { setScheduleMode((v) => !v); setScheduledTime(""); }}
+                style={{ gap: 6 }}
               >
-                ⏰ {scheduleMode ? "Scheduling On" : "Schedule"}
+                <Clock size={13} />
+                {scheduleMode ? "Scheduling on" : "Schedule"}
               </button>
               <button
                 className="btn btn-primary btn-lg"
-                style={{ marginLeft: "auto" }}
+                style={{ marginLeft: "auto", gap: 6 }}
                 onClick={handleCreatePost}
                 disabled={posting}
               >
-                {posting
-                  ? (scheduleMode ? "Scheduling…" : "Publishing…")
-                  : (scheduleMode ? "⏰ Schedule Post" : "🚀 Post Now")}
+                <Send size={14} />
+                {posting ? (scheduleMode ? "Scheduling…" : "Publishing…") : (scheduleMode ? "Schedule" : "Post Now")}
               </button>
             </>
           }
           extraRows={
             scheduleMode && (
               <div className="schedule-row">
-                <span className="schedule-label">📅 Publish at:</span>
-                <input
-                  type="datetime-local"
-                  className="dt-input"
-                  value={scheduledTime}
-                  min={dtMin}
-                  max={dtMax}
-                  onChange={(e) => setScheduledTime(e.target.value)}
-                />
+                <span className="schedule-label">Publish at</span>
+                <input type="datetime-local" className="dt-input" value={scheduledTime}
+                  min={dtMin} max={dtMax} onChange={(e) => setScheduledTime(e.target.value)} />
                 <span className="schedule-hint">10 min – 30 days from now</span>
               </div>
             )
@@ -351,40 +281,30 @@ export default function FacebookPage({ onBack }) {
         />
       )}
 
-      {isLoggedIn && activePage && (
+      {/* Scheduled queue */}
+      {activePage && (
         <div className="queue-section">
           <div className="queue-header">
-            <span className="queue-title">⏰ Scheduled Posts</span>
-            <button
-              className="btn btn-ghost btn-sm"
-              style={{ marginLeft: "auto" }}
-              onClick={() => fetchScheduledPosts(activePage.id, activePage.access_token)}
-            >
-              🔄 Refresh
+            <span className="queue-title">Scheduled Posts</span>
+            <button className="btn btn-ghost btn-sm" style={{ marginLeft: "auto", gap: 6 }}
+              onClick={() => fetchScheduledPosts(activePage.id, activePage.access_token)}>
+              <RefreshCw size={12} /> Refresh
             </button>
           </div>
           {scheduledLoading && <div className="queue-empty">Loading…</div>}
-          {!scheduledLoading && scheduledPosts.length === 0 && (
-            <div className="queue-empty">No scheduled posts.</div>
-          )}
+          {!scheduledLoading && scheduledPosts.length === 0 && <div className="queue-empty">No scheduled posts.</div>}
           {scheduledPosts.map((sp) => {
             const thumb = sp.full_picture || sp.attachments?.data?.[0]?.media?.image?.src;
-            const isCancelling = cancellingId === sp.id;
             return (
               <div key={sp.id} className="queue-item">
                 <div className="queue-item-body">
-                  <div className="queue-time">📅 {new Date(sp.scheduled_publish_time * 1000).toLocaleString()}</div>
-                  <div className="queue-msg">
-                    {sp.message || <i style={{ color: "var(--text-muted)" }}>(no text)</i>}
-                  </div>
+                  <div className="queue-time">{new Date(sp.scheduled_publish_time * 1000).toLocaleString()}</div>
+                  <div className="queue-msg">{sp.message || <i style={{ color: "var(--text-muted)" }}>(no text)</i>}</div>
                 </div>
                 {thumb && <img src={thumb} alt="thumb" className="queue-thumb" />}
-                <button
-                  className="btn btn-danger btn-sm"
-                  disabled={isCancelling}
-                  onClick={() => cancelScheduledPost(sp.id)}
-                >
-                  {isCancelling ? "Cancelling…" : "Cancel"}
+                <button className="btn btn-danger btn-sm" disabled={cancellingId === sp.id}
+                  onClick={() => cancelScheduledPost(sp.id)}>
+                  {cancellingId === sp.id ? "Cancelling…" : "Cancel"}
                 </button>
               </div>
             );
@@ -392,67 +312,59 @@ export default function FacebookPage({ onBack }) {
         </div>
       )}
 
-      {isLoggedIn && (
-        <>
-          <div className="feed-header">
-            <span className="feed-title">Recent Posts{activePage ? ` — ${activePage.name}` : ""}</span>
-            {activePage && (
-              <button
-                className="btn btn-ghost btn-sm"
-                style={{ marginLeft: "auto" }}
-                onClick={() => fetchPosts(activePage.id, activePage.access_token)}
-              >
-                🔄 Refresh
-              </button>
-            )}
-          </div>
-          {posts.length === 0 && (
-            <p style={{ color: "var(--text-muted)", fontSize: 14, padding: "12px 0" }}>No posts fetched yet.</p>
-          )}
-          {posts.map((post) => {
-            const likeCount = post.likes?.summary?.total_count ?? null;
-            const cmtCount  = post.comments?.summary?.total_count ?? null;
-            const eng       = engagement[post.id] || {};
-            const postImg   = post.full_picture || post.attachments?.data?.[0]?.media?.image?.src;
-            const badges = [];
-            if (likeCount !== null) badges.push({ label: `👍 ${likeCount} ${likeCount === 1 ? "Like" : "Likes"}`, className: "likes" });
-            if (cmtCount  !== null) badges.push({ label: `💬 ${cmtCount} ${cmtCount === 1 ? "Comment" : "Comments"}`, className: "comments" });
-            return (
-              <PostCard
-                key={post.id}
-                timestamp={post.created_time}
-                text={post.message}
-                imageUrl={postImg}
-                engagementBadges={badges}
-                toggleLabel="Comments"
-                isOpen={!!eng.open}
-                onToggle={() => toggleComments(post)}
-                showToggle={cmtCount > 0}
-                items={eng.comments}
-                itemLoading={eng.loading}
-                itemError={eng.error}
-                emptyLabel="No comments yet."
-                loadingLabel="Loading comments…"
-                nextCursor={eng.nextCursor}
-                onLoadMore={() => fetchComments(post.id, activePage.access_token, eng.nextCursor)}
-                renderItem={(c, i) => {
-                  const initials = (c.from?.name || "?").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
-                  return (
-                    <div key={i} className="cmt-item">
-                      <div className="cmt-avatar">{initials}</div>
-                      <div className="cmt-bubble">
-                        <div className="cmt-name">{c.from?.name || "Unknown"}</div>
-                        <div className="cmt-text">{c.message}</div>
-                        <div className="cmt-time">{new Date(c.created_time).toLocaleString()}</div>
-                      </div>
-                    </div>
-                  );
-                }}
-              />
-            );
-          })}
-        </>
-      )}
+      {/* Feed */}
+      <div className="feed-header">
+        <span className="feed-title">Recent Posts{activePage ? ` — ${activePage.name}` : ""}</span>
+        {activePage && (
+          <button className="btn btn-ghost btn-sm" style={{ marginLeft: "auto", gap: 6 }}
+            onClick={() => fetchPosts(activePage.id, activePage.access_token)}>
+            <RefreshCw size={12} /> Refresh
+          </button>
+        )}
+      </div>
+      {posts.length === 0 && <p style={{ color: "var(--text-muted)", fontSize: 14 }}>No posts yet.</p>}
+      {posts.map((post) => {
+        const likeCount = post.likes?.summary?.total_count ?? null;
+        const cmtCount  = post.comments?.summary?.total_count ?? null;
+        const eng       = engagement[post.id] || {};
+        const postImg   = post.full_picture || post.attachments?.data?.[0]?.media?.image?.src;
+        const badges = [];
+        if (likeCount !== null) badges.push({ label: `${likeCount} Like${likeCount !== 1 ? "s" : ""}`, className: "likes" });
+        if (cmtCount  !== null) badges.push({ label: `${cmtCount} Comment${cmtCount !== 1 ? "s" : ""}`, className: "comments" });
+        return (
+          <PostCard
+            key={post.id}
+            timestamp={post.created_time}
+            text={post.message}
+            imageUrl={postImg}
+            engagementBadges={badges}
+            toggleLabel="Comments"
+            isOpen={!!eng.open}
+            onToggle={() => toggleComments(post)}
+            showToggle={cmtCount > 0}
+            items={eng.comments}
+            itemLoading={eng.loading}
+            itemError={eng.error}
+            emptyLabel="No comments yet."
+            loadingLabel="Loading comments…"
+            nextCursor={eng.nextCursor}
+            onLoadMore={() => fetchComments(post.id, activePage.access_token, eng.nextCursor)}
+            renderItem={(c, i) => {
+              const initials = (c.from?.name || "?").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+              return (
+                <div key={i} className="cmt-item">
+                  <div className="cmt-avatar">{initials}</div>
+                  <div className="cmt-bubble">
+                    <div className="cmt-name">{c.from?.name || "Unknown"}</div>
+                    <div className="cmt-text">{c.message}</div>
+                    <div className="cmt-time">{new Date(c.created_time).toLocaleString()}</div>
+                  </div>
+                </div>
+              );
+            }}
+          />
+        );
+      })}
     </div>
   );
 }

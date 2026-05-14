@@ -19,13 +19,21 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        // No rewrite — backend already expects /api/* paths
       },
       '/auth': {
         target: 'http://localhost:5000',
         changeOrigin: true,
       },
       '/linkedin': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+      '/x': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+      '/instagram': {
         target: 'http://localhost:5000',
         changeOrigin: true,
       },

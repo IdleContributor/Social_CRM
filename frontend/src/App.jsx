@@ -15,8 +15,18 @@ export default function App() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100svh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ color: "var(--text-muted)", fontSize: 14 }}>Loading…</div>
+      <div style={{
+        minHeight: "100svh", display: "flex", alignItems: "center", justifyContent: "center",
+        background: "var(--bg)", flexDirection: "column", gap: 16,
+      }}>
+        <div style={{
+          width: 40, height: 40, background: "var(--dark)", borderRadius: 10,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: "var(--lime)", fontSize: 20, fontWeight: 700,
+        }}>S</div>
+        <div style={{ color: "var(--text-muted)", fontSize: 14, fontFamily: "var(--font-sans)" }}>
+          Loading…
+        </div>
       </div>
     );
   }

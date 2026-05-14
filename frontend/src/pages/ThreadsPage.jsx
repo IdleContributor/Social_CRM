@@ -3,63 +3,39 @@ import api from "../api.js";
 import "../App.css";
 import { useImagePicker } from "../hooks/useImagePicker.js";
 import { lsGet, lsSet, lsRemove } from "../hooks/useLocalStorage.js";
-import AppHeader from "../components/AppHeader.jsx";
 import ComposeCard from "../components/ComposeCard.jsx";
 import PostCard from "../components/PostCard.jsx";
+import { loginWithThreads } from "../hooks/usePlatformLogin.js";
+import { RefreshCw, Send } from "lucide-react";
 
-function StatusLed({ connected }) {
-  return <span className={`status-led ${connected ? "led-green" : "led-red"}`} aria-hidden="true" />;
-}
-
-export default function ThreadsPage({ onBack }) {
+export default function ThreadsPage() {
   const [accessToken, setAccessToken] = useState(() => localStorage.getItem("threads_token") || null);
   const [profile, setProfile]         = useState(() => lsGet("threads_profile"));
-  const [tokenValid, setTokenValid]   = useState(null); // null = checking
-
-  const [posts, setPosts]               = useState([]);
+  const [tokenValid, setTokenValid]   = useState(null);
+  const [posts, setPosts]             = useState([]);
   const [postsLoading, setPostsLoading] = useState(false);
-  const [postText, setPostText]         = useState("");
-  const [posting, setPosting]           = useState(false);
-  const [postStatus, setPostStatus]     = useState(null);
+  const [postText, setPostText]       = useState("");
+  const [posting, setPosting]         = useState(false);
+  const [postStatus, setPostStatus]   = useState(null);
   const { postImage, imagePreview, fileInputRef, handleImageChange, removeImage } = useImagePicker();
-
-  const [replies, setReplies] = useState({});
+  const [replies, setReplies]         = useState({});
 
   const isLoggedIn = !!accessToken && !!profile && tokenValid === true;
 
-  // ── Fix 3: Verify stored token on mount ───────────────────────────
   useEffect(() => {
     if (!accessToken) { setTokenValid(false); return; }
     api.get("/api/threads/profile", { params: { token: accessToken } })
-      .then((res) => {
-        setProfile(res.data);
-        lsSet("threads_profile", res.data);
-        setTokenValid(true);
-      })
-      .catch(() => clearSession("Session expired. Please log in again."));
+      .then((res) => { setProfile(res.data); lsSet("threads_profile", res.data); setTokenValid(true); })
+      .catch(() => clearSession("Session expired. Please reconnect."));
   }, []);
 
-  // ── Handle OAuth redirect ──────────────────────────────────────────
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
-    if (code) {
-      window.history.replaceState({}, "", window.location.pathname);
-      exchangeCode(code);
-    }
+    if (code) { window.history.replaceState({}, "", window.location.pathname); exchangeCode(code); }
   }, []);
 
   useEffect(() => { if (isLoggedIn) fetchPosts(); }, [isLoggedIn]);
-
-  // ── Auth ───────────────────────────────────────────────────────────
-  const login = async () => {
-    try {
-      const res = await api.get("/api/threads/auth-url");
-      window.location.href = res.data.url;
-    } catch {
-      alert("Failed to get Threads auth URL. Is the server running?");
-    }
-  };
 
   const exchangeCode = async (code) => {
     try {
@@ -67,27 +43,21 @@ export default function ThreadsPage({ onBack }) {
       const token = res.data.access_token;
       setAccessToken(token);
       localStorage.setItem("threads_token", token);
-      // Fetch profile immediately after exchange
       const profileRes = await api.get("/api/threads/profile", { params: { token } });
       setProfile(profileRes.data);
       lsSet("threads_profile", profileRes.data);
       setTokenValid(true);
     } catch (err) {
       console.error("Token exchange failed:", err);
-      alert("Threads login failed. Check server logs.");
       setTokenValid(false);
     }
   };
 
   const clearSession = (msg) => {
-    lsRemove("threads_token");
-    lsRemove("threads_profile");
+    lsRemove("threads_token"); lsRemove("threads_profile");
     localStorage.removeItem("threads_token");
-    setAccessToken(null);
-    setProfile(null);
-    setTokenValid(false);
-    setPosts([]);
-    setReplies({});
+    setAccessToken(null); setProfile(null); setTokenValid(false);
+    setPosts([]); setReplies({});
     if (msg) setPostStatus({ type: "error", msg });
   };
 
@@ -96,45 +66,34 @@ export default function ThreadsPage({ onBack }) {
     clearSession(null);
   };
 
-  // ── Posts ──────────────────────────────────────────────────────────
   const fetchPosts = async () => {
     setPostsLoading(true);
     try {
       const res = await api.get("/api/threads/posts", { params: { token: accessToken } });
       setPosts(res.data.data || []);
     } catch (err) {
-      if (err.response?.status === 401) clearSession("Session expired. Please log in again.");
-      else console.error("Fetch posts failed:", err);
-    } finally {
-      setPostsLoading(false);
-    }
+      if (err.response?.status === 401) clearSession("Session expired.");
+    } finally { setPostsLoading(false); }
   };
 
   const handleCreatePost = async () => {
     if (!postText.trim() && !postImage) { alert("Add some text or an image."); return; }
-    setPosting(true);
-    setPostStatus(null);
+    setPosting(true); setPostStatus(null);
     try {
-      const formData = new FormData();
-      formData.append("token", accessToken);
-      if (postText.trim()) formData.append("text", postText.trim());
-      if (postImage) formData.append("image", postImage);
-      await api.post("/api/threads/create-post", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      setPostStatus({ type: "success", msg: "Thread published! 🎉" });
-      setPostText("");
-      removeImage();
+      const fd = new FormData();
+      fd.append("token", accessToken);
+      if (postText.trim()) fd.append("text", postText.trim());
+      if (postImage) fd.append("image", postImage);
+      await api.post("/api/threads/create-post", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setPostStatus({ type: "success", msg: "Thread published." });
+      setPostText(""); removeImage();
       setTimeout(() => fetchPosts(), 1500);
     } catch (err) {
-      if (err.response?.status === 401) { clearSession("Session expired. Please log in again."); return; }
-      setPostStatus({ type: "error", msg: err.response?.data?.error?.message || "Failed to publish thread." });
-    } finally {
-      setPosting(false);
-    }
+      if (err.response?.status === 401) { clearSession("Session expired."); return; }
+      setPostStatus({ type: "error", msg: err.response?.data?.error?.message || "Failed to publish." });
+    } finally { setPosting(false); }
   };
 
-  // ── Replies ────────────────────────────────────────────────────────
   const fetchReplies = useCallback(async (mediaId, after = null) => {
     setReplies((prev) => ({ ...prev, [mediaId]: { ...prev[mediaId], loading: true, error: null } }));
     try {
@@ -153,11 +112,8 @@ export default function ThreadsPage({ onBack }) {
           loading: false,
         },
       }));
-    } catch (err) {
-      setReplies((prev) => ({
-        ...prev,
-        [mediaId]: { ...prev[mediaId], loading: false, error: err.response?.data?.error?.message || "Failed to load replies." },
-      }));
+    } catch {
+      setReplies((prev) => ({ ...prev, [mediaId]: { ...prev[mediaId], loading: false, error: "Failed to load replies." } }));
     }
   }, [accessToken]);
 
@@ -172,128 +128,117 @@ export default function ThreadsPage({ onBack }) {
     }
   };
 
+  /* ── Checking session ── */
   if (tokenValid === null) {
     return (
-      <div className="app-shell">
-        <AppHeader onBack={onBack} logo="@" logoClass="threads-logo" title="Threads CRM" subtitle="Checking session…" />
-        <div style={{ color: "var(--text-muted)", fontSize: 14, padding: "40px 0", textAlign: "center" }}>
+      <div className="page-content">
+        <div style={{ color: "var(--text-muted)", fontSize: 14, padding: "60px 0", textAlign: "center" }}>
           Verifying session…
         </div>
       </div>
     );
   }
 
-  // ── Render ─────────────────────────────────────────────────────────
-  return (
-    <div className="app-shell">
-      <AppHeader onBack={onBack} logo="@" logoClass="threads-logo" title="Threads CRM" subtitle="Manage posts &amp; replies">
-        <StatusLed connected={isLoggedIn} />
-        {isLoggedIn && (
-          <button className="btn btn-ghost" style={{ marginLeft: "auto" }} onClick={logout}>
-            🚪 Logout
+  /* ── Not connected ── */
+  if (!isLoggedIn) {
+    return (
+      <div className="page-content">
+        {postStatus && <div className={`status-banner ${postStatus.type}`} style={{ marginBottom: 20 }}>{postStatus.msg}</div>}
+        <div className="connect-prompt">
+          <div className="connect-prompt-icon" style={{ background: "#101010" }}>@</div>
+          <h2>Connect Threads</h2>
+          <p>Link your Threads account to publish posts and manage replies.</p>
+          <button className="btn btn-primary btn-lg" onClick={loginWithThreads}>
+            Connect Threads
           </button>
-        )}
-      </AppHeader>
-
-      {postStatus?.type === "error" && !isLoggedIn && (
-        <div className="status-banner error" style={{ marginBottom: 16 }}>{postStatus.msg}</div>
-      )}
-
-      {!isLoggedIn && (
-        <div style={{ padding: "60px 20px", textAlign: "center" }}>
-          <p style={{ color: "var(--text-muted)", fontSize: 15 }}>
-            Please log in from the home page to access Threads features.
-          </p>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {isLoggedIn && profile && (
-        <div className="pages-row">
-          <div className="page-chip active">@{profile.username || profile.name || "me"}</div>
+  /* ── Connected ── */
+  return (
+    <div className="page-content">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <div className="page-chip active" style={{ background: "#101010", borderColor: "#101010" }}>
+          @{profile?.username || profile?.name || "me"}
         </div>
-      )}
+        <button className="btn btn-ghost btn-sm" onClick={logout} style={{ color: "var(--red)" }}>
+          Disconnect
+        </button>
+      </div>
 
-      {isLoggedIn && (
-        <ComposeCard
-          title="✏️ New Thread"
-          badge={profile ? `@${profile.username || profile.name}` : ""}
-          placeholder="Start a thread…"
-          value={postText}
-          onChange={(e) => setPostText(e.target.value)}
-          maxLength={500}
-          imagePreview={imagePreview}
-          onRemoveImage={removeImage}
-          fileInputRef={fileInputRef}
-          onImageChange={handleImageChange}
-          postImage={postImage}
-          status={postStatus}
-          actions={
-            <button
-              className="btn btn-primary btn-lg threads-post-btn"
-              style={{ marginLeft: "auto" }}
-              onClick={handleCreatePost}
-              disabled={posting}
-            >
-              {posting ? "Publishing…" : "🚀 Post Thread"}
-            </button>
-          }
-        />
-      )}
+      {postStatus && <div className={`status-banner ${postStatus.type}`} style={{ marginBottom: 20 }}>{postStatus.msg}</div>}
 
-      {isLoggedIn && (
-        <>
-          <div className="feed-header">
-            <span className="feed-title">Your Threads</span>
-            <button className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }} onClick={fetchPosts}>
-              🔄 Refresh
-            </button>
-          </div>
-          {postsLoading && <p style={{ color: "var(--text-muted)", fontSize: 14 }}>Loading threads…</p>}
-          {!postsLoading && posts.length === 0 && (
-            <p style={{ color: "var(--text-muted)", fontSize: 14, padding: "12px 0" }}>No threads yet.</p>
-          )}
-          {posts.map((post) => {
-            const eng        = replies[post.id] || {};
-            const replyCount = post.replies?.summary?.total_count ?? null;
-            const badges     = replyCount !== null
-              ? [{ label: `💬 ${replyCount} ${replyCount === 1 ? "Reply" : "Replies"}`, className: "comments" }]
-              : [];
-            return (
-              <PostCard
-                key={post.id}
-                timestamp={post.timestamp}
-                text={post.text}
-                imageUrl={post.media_url}
-                engagementBadges={badges}
-                toggleLabel="Replies"
-                isOpen={!!eng.open}
-                onToggle={() => toggleReplies(post)}
-                showToggle={replyCount > 0}
-                items={eng.replies}
-                itemLoading={eng.loading}
-                itemError={eng.error}
-                emptyLabel="No replies yet."
-                loadingLabel="Loading replies…"
-                nextCursor={eng.nextCursor}
-                onLoadMore={() => fetchReplies(post.id, eng.nextCursor)}
-                renderItem={(r, i) => {
-                  const initials = (r.username || "?").slice(0, 2).toUpperCase();
-                  return (
-                    <div key={i} className="cmt-item">
-                      <div className="cmt-avatar">{initials}</div>
-                      <div className="cmt-bubble">
-                        <div className="cmt-name">@{r.username}</div>
-                        <div className="cmt-text">{r.text}</div>
-                        <div className="cmt-time">{new Date(r.timestamp).toLocaleString()}</div>
-                      </div>
-                    </div>
-                  );
-                }}
-              />
-            );
-          })}
-        </>
-      )}
+      <ComposeCard
+        title="New Thread"
+        badge={profile ? `@${profile.username || profile.name}` : ""}
+        placeholder="Start a thread…"
+        value={postText}
+        onChange={(e) => setPostText(e.target.value)}
+        maxLength={500}
+        imagePreview={imagePreview}
+        onRemoveImage={removeImage}
+        fileInputRef={fileInputRef}
+        onImageChange={handleImageChange}
+        postImage={postImage}
+        status={null}
+        actions={
+          <button className="btn btn-primary btn-lg" style={{ marginLeft: "auto", gap: 6 }}
+            onClick={handleCreatePost} disabled={posting}>
+            <Send size={14} />
+            {posting ? "Publishing…" : "Post Thread"}
+          </button>
+        }
+      />
+
+      <div className="feed-header">
+        <span className="feed-title">Your Threads</span>
+        <button className="btn btn-ghost btn-sm" style={{ marginLeft: "auto", gap: 6 }} onClick={fetchPosts}>
+          <RefreshCw size={12} /> Refresh
+        </button>
+      </div>
+
+      {postsLoading && <p style={{ color: "var(--text-muted)", fontSize: 14 }}>Loading…</p>}
+      {!postsLoading && posts.length === 0 && <p style={{ color: "var(--text-muted)", fontSize: 14 }}>No threads yet.</p>}
+
+      {posts.map((post) => {
+        const eng        = replies[post.id] || {};
+        const replyCount = post.replies?.summary?.total_count ?? null;
+        const badges     = replyCount !== null
+          ? [{ label: `${replyCount} ${replyCount === 1 ? "Reply" : "Replies"}`, className: "comments" }]
+          : [];
+        return (
+          <PostCard
+            key={post.id}
+            timestamp={post.timestamp}
+            text={post.text}
+            imageUrl={post.media_url}
+            engagementBadges={badges}
+            toggleLabel="Replies"
+            isOpen={!!eng.open}
+            onToggle={() => toggleReplies(post)}
+            showToggle={replyCount > 0}
+            items={eng.replies}
+            itemLoading={eng.loading}
+            itemError={eng.error}
+            emptyLabel="No replies yet."
+            loadingLabel="Loading replies…"
+            nextCursor={eng.nextCursor}
+            onLoadMore={() => fetchReplies(post.id, eng.nextCursor)}
+            renderItem={(r, i) => (
+              <div key={i} className="cmt-item">
+                <div className="cmt-avatar">{(r.username || "?").slice(0, 2).toUpperCase()}</div>
+                <div className="cmt-bubble">
+                  <div className="cmt-name">@{r.username}</div>
+                  <div className="cmt-text">{r.text}</div>
+                  <div className="cmt-time">{new Date(r.timestamp).toLocaleString()}</div>
+                </div>
+              </div>
+            )}
+          />
+        );
+      })}
     </div>
   );
 }
