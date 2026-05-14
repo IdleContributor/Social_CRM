@@ -182,7 +182,6 @@ export default function LoginScreen() {
           font-size: 11px;
         }
         .login-check-text { font-size: 14px; color: var(--text-secondary); }
-        .login-fine { font-size: 12px; color: var(--text-muted); text-align: center; }
         .login-error { color: var(--red); font-size: 13px; text-align: center; }
 
         /* ── Mobile ── */
@@ -287,7 +286,7 @@ export default function LoginScreen() {
               ))}
             </div>
 
-            <p className="login-fine">We only request your name and email address.</p>
+          
           </div>
         </div>
       </div>
